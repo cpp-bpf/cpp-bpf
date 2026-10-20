@@ -37,6 +37,9 @@ jobs:
           git ls-files '*.cpp' '*.hpp' '*.h' |
             xargs "$LLVM_BIN/clang-format" --style=file --dry-run --Werror
 
+      - name: Check vmlinux.h
+        run: scripts/check-vmlinux.sh "$CLANG" "$BPFTOOL" build/vmlinux-check
+
       - name: Build tests and examples
         run: |
           for d in tests examples/*/; do
