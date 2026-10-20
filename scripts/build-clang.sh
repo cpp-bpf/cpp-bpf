@@ -9,7 +9,9 @@
 # Installs clang, its resource headers and clang-format into PREFIX, using
 # WORKDIR (default: ./llvm-build) for the sources and the build. Needs git,
 # cmake, ninja and a C++ compiler, and a few GB of disk space. Only the BPF
-# target is built, which takes 20-40 minutes on a recent machine.
+# target is built, which takes 20-40 minutes on a recent machine. Optional
+# libraries that BPF programs don't need are left out, so that a clang built
+# on one distribution also runs on others.
 
 set -eu
 
@@ -40,6 +42,9 @@ cmake -S "$work/src/llvm" -B "$work/build" -G Ninja \
 	-DLLVM_INCLUDE_EXAMPLES=OFF \
 	-DCLANG_ENABLE_ARCMT=OFF \
 	-DCLANG_ENABLE_STATIC_ANALYZER=OFF \
+	-DLLVM_ENABLE_LIBXML2=OFF \
+	-DLLVM_ENABLE_ZSTD=OFF \
+	-DLLVM_ENABLE_LIBEDIT=OFF \
 	-DCMAKE_INSTALL_PREFIX="$prefix"
 ninja -C "$work/build" install-clang install-clang-resource-headers \
 	install-clang-format
