@@ -52,8 +52,6 @@ for (auto [pid, s] : procs)
 cpp-bpf is in early development and has no release yet. It needs fixes
 that are not in released toolchains: the
 [tracking issue](https://github.com/cpp-bpf/cpp-bpf/issues/4) lists them.
-In particular, `vmlinux.h` does not compile as C++ yet, so programs declare
-the kernel types they use.
 
 ## Getting started
 
@@ -99,6 +97,29 @@ BPF programs need `-std=gnu++20 -fno-exceptions
 -fno-asynchronous-unwind-tables -gsimple-template-names`, and programs and
 kfunc declarations must be `extern "C"` (`CPPBPF_PROG` does this).
 
+### Kernel types
+
+The `vmlinux.h` that bpftool generates is not valid C++.
+`scripts/gen-vmlinux.py` generates one that is, from the kernel BTF, and
+`mk/cppbpf.mk` builds it as `$(OUT)/include/vmlinux.h`, so programs can
+`#include "vmlinux.h"`. Set `VMLINUX_BTF` to use another kernel's BTF, or
+empty to build without it. The header differs from the C one in places:
+
+- names that are C++ keywords get a `___cpp` suffix: `struct class___cpp`,
+  `page->private___cpp`;
+- so do a few types whose names clash in C++, e.g. `struct irte___cpp`;
+- members whose type is an empty struct, such as `struct lock_class_key`
+  without lockdep, are zero-length arrays, because an empty struct has
+  size 1 in C++;
+- enumerators of an unnamed enum defined inside a struct are in the scope
+  of that struct, as C++ requires.
+
+Read kernel memory with `BPF_CORE_READ()`: clang ignores
+`preserve_access_index` in C++, so plain `->` accesses get no CO-RE
+relocations. Relocations against renamed types work, because libbpf ignores
+the `___` suffix. Relocations against renamed fields, and against members
+that became arrays where the kernel type isn't empty, don't match.
+
 ## Layout
 
 - `include/cppbpf/bpf.hpp`: the BPF side (maps, ring buffer, locks,
@@ -107,6 +128,7 @@ kfunc declarations must be `extern "C"` (`CPPBPF_PROG` does this).
   buffer)
 - `mk/cppbpf.mk`: build rules
 - `examples/`, `tests/`
+- `scripts/gen-vmlinux.py`: `vmlinux.h` for C++
 - `compat/`: checks that the libbpf headers patched for C++ leave C
   programs unchanged
 

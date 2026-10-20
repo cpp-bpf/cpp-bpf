@@ -8,6 +8,9 @@
 #   BPFTOOL        bpftool, for skeletons
 #   LIBBPF_INC     directory with bpf/bpf_helpers.h and bpf/bpf_helper_defs.h
 #   UAPI_INC       directory with linux/bpf.h, if not the system one
+#   VMLINUX_BTF    kernel BTF for vmlinux.h (default: /sys/kernel/btf/vmlinux),
+#                  or empty for none
+#   PYTHON         python3, for vmlinux.h
 #   BPF_SRC_DIR    directory of the *.bpf.cpp sources (default: .)
 #   USER_CFLAGS    flags for the userspace part, e.g. -isystem for libbpf
 #   USER_LDLIBS    libraries for the userspace part (default: -lbpf)
@@ -15,6 +18,7 @@
 # It provides:
 #   $(OUT)/%.bpf.o   from $(BPF_SRC_DIR)/%.bpf.cpp
 #   $(OUT)/%.skel.h  from $(OUT)/%.bpf.o
+#   $(OUT)/include/vmlinux.h, the kernel types as C++, from VMLINUX_BTF
 #   BPF_CXXFLAGS and USER_CXXFLAGS, which write dependency files to $(OUT);
 #   CPPBPF_FLAGS_STAMP, which changes when the build flags change.
 
@@ -26,6 +30,8 @@ CXX ?= c++
 LIBBPF_INC ?= /usr/include
 UAPI_INC ?=
 BPF_SRC_DIR ?= .
+VMLINUX_BTF ?= /sys/kernel/btf/vmlinux
+PYTHON ?= python3
 USER_CFLAGS ?=
 USER_LDLIBS ?= -lbpf
 
@@ -55,8 +61,8 @@ USER_CXXFLAGS := -std=c++20 -O2 -Wall -Wextra -Werror -I$(OUT) \
 
 # Rebuild everything when the toolchain, headers or flags change.
 CPPBPF_FLAGS_STAMP := $(OUT)/flags
-CPPBPF_FLAGS := $(CLANG) $(BPFTOOL) $(CXX) $(LIBBPF_INC) $(BPF_CXXFLAGS) \
-	$(USER_CXXFLAGS) $(USER_LDLIBS)
+CPPBPF_FLAGS := $(CLANG) $(BPFTOOL) $(CXX) $(LIBBPF_INC) $(VMLINUX_BTF) \
+	$(BPF_CXXFLAGS) $(USER_CXXFLAGS) $(USER_LDLIBS)
 
 $(CPPBPF_FLAGS_STAMP): FORCE
 	@mkdir -p $(OUT)
@@ -76,7 +82,23 @@ $(HELPERS_STAMP): $(CPPBPF_FLAGS_STAMP) $(CPPBPF_DIR)/mk/cppbpf.mk \
 	! grep -q '= (void \*) [0-9]*;' $(OUT)/include/bpf/bpf_helper_defs.h
 	touch $@
 
-$(OUT)/%.bpf.o: $(BPF_SRC_DIR)/%.bpf.cpp $(HELPERS_STAMP)
+# Programs can include it as "vmlinux.h"; see scripts/gen-vmlinux.py.
+# Set VMLINUX_BTF empty to build without it.
+ifneq ($(VMLINUX_BTF),)
+ifeq ($(wildcard $(VMLINUX_BTF)),)
+$(error VMLINUX_BTF=$(VMLINUX_BTF) doesn't exist; set it to the kernel BTF for vmlinux.h, or empty to build without vmlinux.h)
+endif
+VMLINUX_H := $(OUT)/include/vmlinux.h
+endif
+
+$(OUT)/include/vmlinux.h: $(VMLINUX_BTF) $(CPPBPF_DIR)/scripts/gen-vmlinux.py \
+		$(CPPBPF_FLAGS_STAMP)
+	mkdir -p $(OUT)/include
+	$(PYTHON) $(CPPBPF_DIR)/scripts/gen-vmlinux.py --bpftool $(BPFTOOL) \
+		$(VMLINUX_BTF) > $@.tmp
+	mv $@.tmp $@
+
+$(OUT)/%.bpf.o: $(BPF_SRC_DIR)/%.bpf.cpp $(HELPERS_STAMP) $(VMLINUX_H)
 	$(CLANG) $(BPF_CXXFLAGS) -c $< -o $@
 
 $(OUT)/%.skel.h: $(OUT)/%.bpf.o
