@@ -48,21 +48,24 @@ private:
 	T *p_;
 };
 
-} /* namespace cppbpf */
+/*
+ * A ring buffer map:
+ *
+ *   cppbpf::ringbuf<256 * 1024> events SEC(".maps");
+ */
+template <unsigned Size>
+struct ringbuf {
+	int (*type)[BPF_MAP_TYPE_RINGBUF];
+	int (*max_entries)[Size];
 
-/* A ring buffer map: CPPBPF_RINGBUF(events, 256 * 1024). */
-#define CPPBPF_RINGBUF(name, size)					\
-	struct name##__cppbpf_ringbuf {					\
-		int (*type)[BPF_MAP_TYPE_RINGBUF];			\
-		int (*max_entries)[size];				\
-									\
-		template <class T>					\
-		[[nodiscard]] CPPBPF_INLINE				\
-		::cppbpf::ringbuf_entry<T> reserve()			\
-		{							\
-			return ::cppbpf::ringbuf_entry<T>(static_cast<T *>( \
-				bpf_ringbuf_reserve(this, sizeof(T), 0))); \
-		}							\
-	} name SEC(".maps")
+	template <class T>
+	[[nodiscard]] CPPBPF_INLINE ringbuf_entry<T> reserve()
+	{
+		return ringbuf_entry<T>(static_cast<T *>(
+			bpf_ringbuf_reserve(this, sizeof(T), 0)));
+	}
+};
+
+} /* namespace cppbpf */
 
 #endif /* CPPBPF_RINGBUF_HPP */

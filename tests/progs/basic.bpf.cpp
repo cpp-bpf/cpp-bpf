@@ -11,8 +11,8 @@ struct stats {
 	struct bpf_spin_lock lock;
 };
 
-CPPBPF_HASH_MAP(per_pid, __u32, stats, 1024);
-CPPBPF_RINGBUF(events, 64 * 1024);
+cppbpf::hash_map<__u32, stats, 1024> per_pid SEC(".maps");
+cppbpf::ringbuf<64 * 1024> events SEC(".maps");
 
 const volatile __u32 target_tgid = 0;
 
