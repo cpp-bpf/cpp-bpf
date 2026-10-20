@@ -23,7 +23,8 @@ USER_CFLAGS ?=
 USER_LDLIBS ?= -lbpf
 
 OUT := build
-BPF_CXXFLAGS := -g -O2 --target=bpf -std=gnu++20 -fno-exceptions \
+BPF_CXXFLAGS := -g -gsimple-template-names -O2 --target=bpf -std=gnu++20 \
+	-fno-exceptions \
 	-fno-asynchronous-unwind-tables -D__TARGET_ARCH_$(ARCH) \
 	-I$(OUT)/include -I$(LIBBPF_INC) -I../include -Iprogs \
 	$(if $(UAPI_INC),-I$(UAPI_INC)) $(if $(MULTIARCH_INC),-I$(MULTIARCH_INC)) \
