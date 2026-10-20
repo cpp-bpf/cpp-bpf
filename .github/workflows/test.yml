@@ -2,19 +2,25 @@ name: Test
 
 on:
   push:
-    branches: [main, prototype]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
-  # clang with llvm/llvm-project#233715 until it is in an LLVM release.
+  # clang with llvm/llvm-project#233715 until it is in an LLVM release. The
+  # branch bpf-btf-cxx-records on the fork keeps this commit reachable.
   LLVM_REPO: maxskokov/llvm-project
   LLVM_SHA: 5b41c481dec56b73f856713824f0a2de6836e0ed
-  LIBBPF_TAG: v1.8.0
+  LIBBPF_SHA: 85c0d575a447651bbeb8e2376eacd64c30dce9a6 # v1.8.0
   BPFTOOL_TAG: v7.7.0
+  BPFTOOL_SHA256: 09150596f09356b0ff632dd7f9856e0ea86bf96b269e9bc94278d9a9432a268c
 
 jobs:
   test:
@@ -34,10 +40,10 @@ jobs:
 
       - name: Restore clang
         id: llvm-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/llvm
-          key: llvm-${{ runner.os }}-${{ env.LLVM_SHA }}
+          key: llvm-${{ runner.os }}-${{ env.LLVM_SHA }}-v2
 
       - name: Build clang
         if: steps.llvm-cache.outputs.cache-hit != 'true'
@@ -57,11 +63,27 @@ jobs:
             -DCLANG_ENABLE_ARCMT=OFF \
             -DCLANG_ENABLE_STATIC_ANALYZER=OFF \
             -DCMAKE_INSTALL_PREFIX="$HOME/llvm"
-          ninja -C build install-clang install-clang-resource-headers
+          ninja -C build install-clang install-clang-resource-headers \
+            install-clang-format
+
+      # Saved right away, so that a later failure doesn't lose the build.
+      - name: Save clang
+        if: steps.llvm-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/llvm
+          key: llvm-${{ runner.os }}-${{ env.LLVM_SHA }}-v2
+
+      - name: Check formatting
+        run: |
+          git ls-files '*.cpp' '*.hpp' '*.h' |
+            xargs "$HOME/llvm/bin/clang-format" --style=file --dry-run --Werror
 
       - name: Build libbpf
         run: |
-          git clone -q --depth 1 --branch "$LIBBPF_TAG" https://github.com/libbpf/libbpf ~/libbpf
+          git init -q ~/libbpf
+          git -C ~/libbpf fetch -q --depth 1 https://github.com/libbpf/libbpf "$LIBBPF_SHA"
+          git -C ~/libbpf checkout -q FETCH_HEAD
           make -C ~/libbpf/src -j"$(nproc)" BUILD_STATIC_ONLY=1 \
             PREFIX="$HOME/libbpf-install" LIBDIR="$HOME/libbpf-install/lib" \
             install install_uapi_headers
@@ -69,22 +91,22 @@ jobs:
       - name: Install bpftool
         run: |
           f="bpftool-$BPFTOOL_TAG-amd64.tar.gz"
-          url="https://github.com/libbpf/bpftool/releases/download/$BPFTOOL_TAG"
-          curl -sSfLO "$url/$f"
-          curl -sSfLO "$url/$f.sha256sum"
-          sha256sum -c "$f.sha256sum"
+          curl -sSfLO "https://github.com/libbpf/bpftool/releases/download/$BPFTOOL_TAG/$f"
+          echo "$BPFTOOL_SHA256  $f" | sha256sum -c -
           tar -xzf "$f"
           chmod +x bpftool
 
-      - name: Build tests
+      - name: Build tests and examples
         run: |
           inc="$HOME/libbpf-install/include"
-          make -C tests \
-            CLANG="$HOME/llvm/bin/clang" \
-            BPFTOOL="$PWD/bpftool" \
-            LIBBPF_INC="$inc" UAPI_INC="$inc" \
-            USER_CFLAGS="-I$inc" \
-            USER_LDLIBS="$HOME/libbpf-install/lib/libbpf.a -lelf -lz"
+          for d in tests examples/*/; do
+            make -C "$d" -j"$(nproc)" \
+              CLANG="$HOME/llvm/bin/clang" \
+              BPFTOOL="$PWD/bpftool" \
+              LIBBPF_INC="$inc" UAPI_INC="$inc" \
+              USER_CFLAGS="-isystem $inc" \
+              USER_LDLIBS="$HOME/libbpf-install/lib/libbpf.a -lelf -lz"
+          done
 
       - name: Run tests
         run: |
@@ -92,4 +114,12 @@ jobs:
           for t in tests/build/*_test; do
             echo "== $t"
             sudo "$t"
+          done
+
+      - name: Run examples
+        run: |
+          for d in examples/*/; do
+            name=$(basename "$d")
+            echo "== $name"
+            sudo "$d/build/$name" 1
           done

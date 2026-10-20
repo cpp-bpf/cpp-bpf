@@ -9,12 +9,21 @@ namespace cppbpf {
 /*
  * A ring buffer reservation. It is discarded when it goes out of scope
  * unless it was submitted, so a reservation can't leak on an early return.
- * It can be moved, e.g. returned from a helper function, but not copied.
+ * It can be moved, e.g. returned from a helper function, but not copied:
+ *
+ *   auto e = events.reserve<event>();
+ *   event *ev = e.get();
+ *   if (!ev)
+ *           return 0;
+ *   ev->pid = pid;
+ *   e.submit();
  */
+template <unsigned Size>
+struct ringbuf;
+
 template <class T>
 class ringbuf_entry {
 public:
-	CPPBPF_INLINE explicit ringbuf_entry(T *p) : p_(p) {}
 	CPPBPF_INLINE ~ringbuf_entry()
 	{
 		if (p_)
@@ -29,22 +38,43 @@ public:
 	ringbuf_entry &operator=(const ringbuf_entry &) = delete;
 	ringbuf_entry &operator=(ringbuf_entry &&) = delete;
 
-	CPPBPF_INLINE explicit operator bool() const { return p_; }
-	CPPBPF_INLINE T *operator->() const { return p_; }
-	CPPBPF_INLINE T &operator*() const { return *p_; }
+	/*
+	 * The reserved record, or NULL if the reservation failed. As with
+	 * maybe, there is no operator->: take the pointer out and check it.
+	 */
+	CPPBPF_INLINE T *get() const
+	{
+		return p_;
+	}
 
+	CPPBPF_INLINE explicit operator bool() const
+	{
+		return p_;
+	}
+
+	/* Submit the record; does nothing if the reservation failed. */
 	CPPBPF_INLINE void submit(__u64 flags = 0)
 	{
-		bpf_ringbuf_submit(p_, flags);
+		if (p_)
+			bpf_ringbuf_submit(p_, flags);
 		p_ = nullptr;
 	}
+	/* Discard the record; does nothing if the reservation failed. */
 	CPPBPF_INLINE void discard(__u64 flags = 0)
 	{
-		bpf_ringbuf_discard(p_, flags);
+		if (p_)
+			bpf_ringbuf_discard(p_, flags);
 		p_ = nullptr;
 	}
 
 private:
+	template <unsigned Size>
+	friend struct ringbuf;
+
+	CPPBPF_INLINE explicit ringbuf_entry(T *p) : p_(p)
+	{
+	}
+
 	T *p_;
 };
 
