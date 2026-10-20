@@ -24,29 +24,12 @@ runs:
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/llvm
-        key: llvm-${{ runner.os }}-${{ env.LLVM_SHA }}-v2
+        key: llvm-${{ runner.os }}-${{ hashFiles('scripts/build-clang.sh') }}
 
     - name: Build clang
       if: steps.llvm-cache.outputs.cache-hit != 'true'
       shell: bash
-      run: |
-        git init -q ~/llvm-src
-        cd ~/llvm-src
-        git fetch -q --depth 1 "https://github.com/$LLVM_REPO" "$LLVM_SHA"
-        git checkout -q FETCH_HEAD
-        cmake -S llvm -B build -G Ninja \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DLLVM_ENABLE_PROJECTS=clang \
-          -DLLVM_TARGETS_TO_BUILD=BPF \
-          -DLLVM_ENABLE_ASSERTIONS=ON \
-          -DLLVM_INCLUDE_TESTS=OFF \
-          -DLLVM_INCLUDE_BENCHMARKS=OFF \
-          -DLLVM_INCLUDE_EXAMPLES=OFF \
-          -DCLANG_ENABLE_ARCMT=OFF \
-          -DCLANG_ENABLE_STATIC_ANALYZER=OFF \
-          -DCMAKE_INSTALL_PREFIX="$HOME/llvm"
-        ninja -C build install-clang install-clang-resource-headers \
-          install-clang-format
+      run: scripts/build-clang.sh ~/llvm ~/llvm-build
 
     # Saved right away, so that a later failure doesn't lose the build.
     - name: Save clang
@@ -54,7 +37,7 @@ runs:
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/llvm
-        key: llvm-${{ runner.os }}-${{ env.LLVM_SHA }}-v2
+        key: llvm-${{ runner.os }}-${{ hashFiles('scripts/build-clang.sh') }}
 
     - name: Build libbpf
       shell: bash

@@ -58,19 +58,38 @@ the kernel types they use.
 
 You need:
 
-- clang built with
-  [llvm/llvm-project#233715](https://github.com/llvm/llvm-project/pull/233715)
-  (C++ records in BTF), until it is in an LLVM release
+- clang with C++ records in BTF (see below)
 - libbpf with its BPF-side headers, and bpftool; tested with libbpf 1.5
   and 1.8 (on Debian: `libbpf-dev`, `bpftool`, `linux-libc-dev`; older
   distributions may need libbpf built from source)
 - Linux 6.1 or newer with BTF
 
+### clang
+
+Released clang versions crash or emit wrong BTF on C++ classes with member
+functions, base classes or the `class` keyword. The fix,
+[llvm/llvm-project#233715](https://github.com/llvm/llvm-project/pull/233715),
+is under review. Until it is merged, build clang from that branch with
+`scripts/build-clang.sh`, the same script CI uses:
+
+```
+scripts/build-clang.sh $HOME/.local/cppbpf-clang
+```
+
+It needs git, cmake, ninja and a C++ compiler, builds only the BPF target
+and takes 20-40 minutes on a recent machine. Only the BPF programs need
+this clang; the userspace part builds with any C++20 compiler.
+
+Once the fix is merged, the nightly packages from
+[apt.llvm.org](https://apt.llvm.org/) will work, and later LLVM releases.
+
+### Example
+
 Build and run the example, which counts system calls per process:
 
 ```
 cd examples/syscount
-make CLANG=/path/to/clang BPFTOOL=bpftool LIBBPF_INC=/usr/include
+make CLANG=$HOME/.local/cppbpf-clang/bin/clang BPFTOOL=bpftool LIBBPF_INC=/usr/include
 sudo build/syscount 5
 ```
 
