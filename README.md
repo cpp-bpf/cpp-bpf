@@ -17,6 +17,11 @@ upstream compiler support for C++ records in LLVM's BPF backend, which the
 library depends on. See the
 [roadmap](https://github.com/cpp-bpf/.github/blob/main/VISION.md#roadmap).
 
+## Users
+
+If you write BPF programs in C++, with or without cpp-bpf, please add
+yourself to [USERS.md](USERS.md).
+
 ## Requirements
 
 - C++20
