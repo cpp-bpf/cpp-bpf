@@ -1,0 +1,95 @@
+name: Test
+
+on:
+  push:
+    branches: [main, prototype]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # clang with llvm/llvm-project#233715 until it is in an LLVM release.
+  LLVM_REPO: maxskokov/llvm-project
+  LLVM_SHA: 5b41c481dec56b73f856713824f0a2de6836e0ed
+  LIBBPF_TAG: v1.8.0
+  BPFTOOL_TAG: v7.7.0
+
+jobs:
+  test:
+    name: Build and run tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build libelf-dev zlib1g-dev pkg-config linux-libc-dev
+
+      - name: Restore clang
+        id: llvm-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/llvm
+          key: llvm-${{ runner.os }}-${{ env.LLVM_SHA }}
+
+      - name: Build clang
+        if: steps.llvm-cache.outputs.cache-hit != 'true'
+        run: |
+          git init -q ~/llvm-src
+          cd ~/llvm-src
+          git fetch -q --depth 1 "https://github.com/$LLVM_REPO" "$LLVM_SHA"
+          git checkout -q FETCH_HEAD
+          cmake -S llvm -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLLVM_ENABLE_PROJECTS=clang \
+            -DLLVM_TARGETS_TO_BUILD=BPF \
+            -DLLVM_ENABLE_ASSERTIONS=ON \
+            -DLLVM_INCLUDE_TESTS=OFF \
+            -DLLVM_INCLUDE_BENCHMARKS=OFF \
+            -DLLVM_INCLUDE_EXAMPLES=OFF \
+            -DCLANG_ENABLE_ARCMT=OFF \
+            -DCLANG_ENABLE_STATIC_ANALYZER=OFF \
+            -DCMAKE_INSTALL_PREFIX="$HOME/llvm"
+          ninja -C build install-clang install-clang-resource-headers
+
+      - name: Build libbpf
+        run: |
+          git clone -q --depth 1 --branch "$LIBBPF_TAG" https://github.com/libbpf/libbpf ~/libbpf
+          make -C ~/libbpf/src -j"$(nproc)" BUILD_STATIC_ONLY=1 \
+            PREFIX="$HOME/libbpf-install" LIBDIR="$HOME/libbpf-install/lib" \
+            install install_uapi_headers
+
+      - name: Install bpftool
+        run: |
+          f="bpftool-$BPFTOOL_TAG-amd64.tar.gz"
+          url="https://github.com/libbpf/bpftool/releases/download/$BPFTOOL_TAG"
+          curl -sSfLO "$url/$f"
+          curl -sSfLO "$url/$f.sha256sum"
+          sha256sum -c "$f.sha256sum"
+          tar -xzf "$f"
+          chmod +x bpftool
+
+      - name: Build tests
+        run: |
+          inc="$HOME/libbpf-install/include"
+          make -C tests \
+            CLANG="$HOME/llvm/bin/clang" \
+            BPFTOOL="$PWD/bpftool" \
+            LIBBPF_INC="$inc" UAPI_INC="$inc" \
+            USER_CFLAGS="-I$inc" \
+            USER_LDLIBS="$HOME/libbpf-install/lib/libbpf.a -lelf -lz"
+
+      - name: Run tests
+        run: |
+          uname -r
+          for t in tests/build/*_test; do
+            echo "== $t"
+            sudo "$t"
+          done
