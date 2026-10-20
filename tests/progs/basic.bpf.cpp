@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
-#include "types.h"
+#include "vmlinux.h"
 #include <cppbpf/bpf.hpp>
 #include <bpf/bpf_core_read.h>
 #include "basic.h"
@@ -15,6 +15,7 @@ cppbpf::hash_map<__u32, stats, 1024> per_pid SEC(".maps");
 cppbpf::ringbuf<64 * 1024> events SEC(".maps");
 
 const volatile __u32 target_tgid = 0;
+struct core_result core;
 
 CPPBPF_PROG("tp_btf/sched_switch", on_switch, bool preempt,
 	    struct task_struct *prev, struct task_struct *next)
@@ -22,6 +23,10 @@ CPPBPF_PROG("tp_btf/sched_switch", on_switch, bool preempt,
 	__u32 tgid = BPF_CORE_READ(next, tgid);
 	if (tgid != target_tgid)
 		return 0;
+
+	/* vmlinux.h renames struct class, a C++ keyword, to class___cpp. */
+	core.class_exists = bpf_core_type_exists(struct class___cpp);
+	core.class_size = bpf_core_type_size(struct class___cpp);
 
 	stats *s = per_pid.lookup_or_init(tgid).get();
 	if (!s)

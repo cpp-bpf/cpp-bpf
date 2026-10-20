@@ -6,6 +6,11 @@ struct event {
 	__u32 pid;
 };
 
+struct core_result {
+	__u32 class_exists;
+	__u32 class_size;
+};
+
 /* The userspace view of the per_pid values in basic.bpf.cpp. */
 struct stats_view {
 	__u64 switches;

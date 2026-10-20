@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
 // The kernel calls bpf_fentry_test*() with known arguments from
 // BPF_PROG_TEST_RUN of a tracing program (net/bpf/test_run.c).
-#include "types.h"
+#include "vmlinux.h"
 #include <cppbpf/bpf.hpp>
 #include "args.h"
 

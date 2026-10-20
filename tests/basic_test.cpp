@@ -53,6 +53,9 @@ int main()
 	static_assert(std::input_iterator<decltype(per_pid.begin())>);
 	static_assert(std::ranges::input_range<decltype(per_pid)>);
 
+	CHECK(obj->bss->core.class_exists == 1, "struct class___cpp not found");
+	CHECK(obj->bss->core.class_size > 0, "struct class___cpp has size 0");
+
 	reader.consume();
 	CHECK(events > 0, "no events from the worker thread");
 	CHECK(main_thread == 0,
