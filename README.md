@@ -1,5 +1,6 @@
 # cpp-bpf
 
+[![Test](https://github.com/cpp-bpf/cpp-bpf/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/cpp-bpf/cpp-bpf/actions/workflows/test.yml)
 [![License](https://img.shields.io/static/v1?label=License&message=LGPL-2.1%20OR%20BSD-2-Clause&color=blue)](LICENSE)
 [![Status](https://img.shields.io/static/v1?label=Status&message=early%20development&color=orange)](#status)
 [![Vision](https://img.shields.io/static/v1?label=Vision&message=and%20Scope&color=blue)](https://github.com/cpp-bpf/.github/blob/main/VISION.md)
