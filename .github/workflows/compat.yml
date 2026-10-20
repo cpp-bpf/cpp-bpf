@@ -26,8 +26,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  LLVM_REPO: maxskokov/llvm-project
-  LLVM_SHA: 5b41c481dec56b73f856713824f0a2de6836e0ed
   LIBBPF_SHA: 85c0d575a447651bbeb8e2376eacd64c30dce9a6 # v1.8.0
   BPFTOOL_TAG: v7.7.0
   BPFTOOL_SHA256: 09150596f09356b0ff632dd7f9856e0ea86bf96b269e9bc94278d9a9432a268c
