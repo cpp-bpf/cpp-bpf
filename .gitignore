@@ -1,2 +1,3 @@
 tests/build/
 examples/*/build/
+compat/build/

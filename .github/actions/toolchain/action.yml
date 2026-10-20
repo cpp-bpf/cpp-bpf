@@ -1,0 +1,91 @@
+name: Toolchain
+description: >
+  clang with C++ BTF support (cached), libbpf built from source, and
+  bpftool. Sets CLANG, BPFTOOL, LIBBPF_INC, LIBBPF_LIB and LLVM_BIN in the
+  environment of later steps.
+
+inputs:
+  libbpf-ref:
+    description: libbpf commit or branch to build
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install build dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          cmake ninja-build libelf-dev zlib1g-dev pkg-config linux-libc-dev
+
+    - name: Restore clang
+      id: llvm-cache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/llvm
+        key: llvm-${{ runner.os }}-${{ env.LLVM_SHA }}-v2
+
+    - name: Build clang
+      if: steps.llvm-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        git init -q ~/llvm-src
+        cd ~/llvm-src
+        git fetch -q --depth 1 "https://github.com/$LLVM_REPO" "$LLVM_SHA"
+        git checkout -q FETCH_HEAD
+        cmake -S llvm -B build -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DLLVM_ENABLE_PROJECTS=clang \
+          -DLLVM_TARGETS_TO_BUILD=BPF \
+          -DLLVM_ENABLE_ASSERTIONS=ON \
+          -DLLVM_INCLUDE_TESTS=OFF \
+          -DLLVM_INCLUDE_BENCHMARKS=OFF \
+          -DLLVM_INCLUDE_EXAMPLES=OFF \
+          -DCLANG_ENABLE_ARCMT=OFF \
+          -DCLANG_ENABLE_STATIC_ANALYZER=OFF \
+          -DCMAKE_INSTALL_PREFIX="$HOME/llvm"
+        ninja -C build install-clang install-clang-resource-headers \
+          install-clang-format
+
+    # Saved right away, so that a later failure doesn't lose the build.
+    - name: Save clang
+      if: steps.llvm-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/llvm
+        key: llvm-${{ runner.os }}-${{ env.LLVM_SHA }}-v2
+
+    - name: Build libbpf
+      shell: bash
+      env:
+        LIBBPF_REF: ${{ inputs.libbpf-ref }}
+      run: |
+        git init -q ~/libbpf
+        git -C ~/libbpf fetch -q --depth 1 https://github.com/libbpf/libbpf "$LIBBPF_REF"
+        git -C ~/libbpf checkout -q FETCH_HEAD
+        git -C ~/libbpf log -1 --format='libbpf %H %s'
+        make -C ~/libbpf/src -j"$(nproc)" BUILD_STATIC_ONLY=1 \
+          PREFIX="$HOME/libbpf-install" LIBDIR="$HOME/libbpf-install/lib" \
+          install install_uapi_headers
+
+    - name: Install bpftool
+      shell: bash
+      run: |
+        mkdir -p ~/bpftool && cd ~/bpftool
+        f="bpftool-$BPFTOOL_TAG-amd64.tar.gz"
+        curl -sSfLO "https://github.com/libbpf/bpftool/releases/download/$BPFTOOL_TAG/$f"
+        echo "$BPFTOOL_SHA256  $f" | sha256sum -c -
+        tar -xzf "$f"
+        chmod +x bpftool
+
+    - name: Export paths
+      shell: bash
+      run: |
+        {
+          echo "CLANG=$HOME/llvm/bin/clang"
+          echo "LLVM_BIN=$HOME/llvm/bin"
+          echo "BPFTOOL=$HOME/bpftool/bpftool"
+          echo "LIBBPF_INC=$HOME/libbpf-install/include"
+          echo "LIBBPF_LIB=$HOME/libbpf-install/lib/libbpf.a"
+        } >> "$GITHUB_ENV"

@@ -87,6 +87,8 @@ kfunc declarations must be `extern "C"` (`CPPBPF_PROG` does this).
   buffer)
 - `mk/cppbpf.mk`: build rules
 - `examples/`, `tests/`
+- `compat/`: checks that the libbpf headers patched for C++ leave C
+  programs unchanged
 
 ## Users
 
