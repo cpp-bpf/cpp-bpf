@@ -13,8 +13,7 @@
 #include <bpf/bpf_helpers.h>
 
 /* Program license, e.g. CPPBPF_LICENSE("GPL"). */
-#define CPPBPF_LICENSE(lic) \
-	extern "C" char LICENSE[] SEC("license") = lic
+#define CPPBPF_LICENSE(lic) extern "C" char LICENSE[] SEC("license") = lic
 
 #define CPPBPF_INLINE inline __attribute__((always_inline))
 

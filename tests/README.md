@@ -6,9 +6,11 @@ it with libbpf and checks the result. They need root and a kernel with BTF.
 Until the fixes tracked in #4 are upstream, building needs:
 
 - clang with llvm/llvm-project#233715
-- the libbpf BPF-side headers from bpf-next (`LIBBPF_INC`); the Makefile
-  makes a copy of `bpf_helper_defs.h` that compiles as C++
+- the libbpf BPF-side headers (`LIBBPF_INC`); the build makes a copy of
+  `bpf_helper_defs.h` that compiles as C++
 - bpftool and libbpf for the userspace part
+
+The build rules are in `../mk/cppbpf.mk`, which lists the variables:
 
 ```
 make CLANG=... BPFTOOL=... LIBBPF_INC=... UAPI_INC=...
@@ -21,4 +23,5 @@ sudo build/basic_test && sudo build/args_test
   `bpf_fentry_test*()` functions that the kernel calls with known values
   on `BPF_PROG_TEST_RUN`.
 
-Tested on bpf-next 7.3-rc5.
+CI runs them on the GitHub runner kernel; they were also tested on
+bpf-next 7.3-rc5.

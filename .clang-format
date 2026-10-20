@@ -1,0 +1,40 @@
+# Kernel style, as used by libbpf, adapted for C++.
+BasedOnStyle: LLVM
+Language: Cpp
+Standard: c++20
+UseTab: Always
+IndentWidth: 8
+TabWidth: 8
+ContinuationIndentWidth: 8
+ColumnLimit: 80
+AccessModifierOffset: -8
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: false
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterFunction: true
+  AfterNamespace: false
+  AfterStruct: false
+  AfterUnion: false
+  BeforeCatch: false
+  BeforeElse: false
+  SplitEmptyFunction: true
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortLambdasOnASingleLine: Empty
+AlignAfterOpenBracket: Align
+AlignEscapedNewlines: Right
+AlignTrailingComments: false
+BreakTemplateDeclarations: Yes
+BreakConstructorInitializers: AfterColon
+NamespaceIndentation: None
+FixNamespaceComments: false
+PointerAlignment: Right
+SortIncludes: Never
+SpaceAfterTemplateKeyword: true
+SpacesBeforeTrailingComments: 1
+ConstructorInitializerIndentWidth: 8
+PackConstructorInitializers: CurrentLine
+Cpp11BracedListStyle: false

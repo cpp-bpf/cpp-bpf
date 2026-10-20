@@ -9,11 +9,24 @@ namespace cppbpf::detail {
 template <class T, T... I>
 struct index_seq {};
 
-template <unsigned long N> struct uint_of;
-template <> struct uint_of<1> { using type = unsigned char; };
-template <> struct uint_of<2> { using type = unsigned short; };
-template <> struct uint_of<4> { using type = unsigned int; };
-template <> struct uint_of<8> { using type = unsigned long long; };
+template <unsigned long N>
+struct uint_of;
+template <>
+struct uint_of<1> {
+	using type = unsigned char;
+};
+template <>
+struct uint_of<2> {
+	using type = unsigned short;
+};
+template <>
+struct uint_of<4> {
+	using type = unsigned int;
+};
+template <>
+struct uint_of<8> {
+	using type = unsigned long long;
+};
 
 /* Context slots taken by an argument: structs up to 16 bytes take two. */
 template <class T>
@@ -49,10 +62,12 @@ CPPBPF_INLINE T ctx_arg(unsigned long long *ctx)
 	static_assert(!__is_reference(T),
 		      "CPPBPF_PROG parameters can't be references");
 	if constexpr (__is_class(T) || __is_union(T)) {
-		static_assert(sizeof(T) <= 16,
-			      "structs passed by value can be at most 16 bytes");
-		static_assert(__is_trivially_copyable(T),
-			      "structs passed by value must be trivially copyable");
+		static_assert(
+			sizeof(T) <= 16,
+			"structs passed by value can be at most 16 bytes");
+		static_assert(
+			__is_trivially_copyable(T),
+			"structs passed by value must be trivially copyable");
 		unsigned long long raw[slots_of<T>()];
 		for (unsigned long i = 0; i < slots_of<T>(); i++)
 			raw[i] = ctx[Off + i];
@@ -60,18 +75,22 @@ CPPBPF_INLINE T ctx_arg(unsigned long long *ctx)
 		__builtin_memcpy(buf, raw, sizeof(T));
 		return __builtin_bit_cast(T, buf);
 	} else if constexpr (__is_pointer(T)) {
-		return (T)ctx[Off];
+		return reinterpret_cast<T>(ctx[Off]);
 	} else if constexpr (__is_enum(T)) {
 		using U = __underlying_type(T);
-		return (T)(U)(typename uint_of<sizeof(U)>::type)ctx[Off];
+		using raw = typename uint_of<sizeof(U)>::type;
+		return static_cast<T>(
+			static_cast<U>(static_cast<raw>(ctx[Off])));
 	} else {
 		static_assert(__is_integral(T),
 			      "unsupported CPPBPF_PROG parameter type");
-		return (T)(typename uint_of<sizeof(T)>::type)ctx[Off];
+		using raw = typename uint_of<sizeof(T)>::type;
+		return static_cast<T>(static_cast<raw>(ctx[Off]));
 	}
 }
 
-template <class F> struct fn_traits;
+template <class F>
+struct fn_traits;
 template <class R, class... A>
 struct fn_traits<R (*)(A...)> {
 	static constexpr unsigned long arity = sizeof...(A);
@@ -89,9 +108,10 @@ CPPBPF_INLINE R call_impl(unsigned long long *ctx, R (*)(A...),
 template <auto F>
 CPPBPF_INLINE auto call_with_ctx(unsigned long long *ctx)
 {
-	return call_impl<F>(ctx, F,
-			    __make_integer_seq<index_seq, unsigned long,
-					       fn_traits<decltype(F)>::arity>{});
+	return call_impl<F>(
+		ctx, F,
+		__make_integer_seq<index_seq, unsigned long,
+				   fn_traits<decltype(F)>::arity>{});
 }
 
 } /* namespace cppbpf::detail */
@@ -111,12 +131,12 @@ CPPBPF_INLINE auto call_with_ctx(unsigned long long *ctx)
  * structs of up to 16 bytes passed by value. The program symbol is
  * extern "C", so libbpf sees its plain name.
  */
-#define CPPBPF_PROG(sec, name, ...)					\
-	static CPPBPF_INLINE int ____##name(__VA_ARGS__);		\
-	SEC(sec) extern "C" int name(unsigned long long *ctx)		\
-	{								\
-		return ::cppbpf::detail::call_with_ctx<____##name>(ctx); \
-	}								\
+#define CPPBPF_PROG(sec, name, ...)                                            \
+	static CPPBPF_INLINE int ____##name(__VA_ARGS__);                      \
+	SEC(sec) extern "C" int name(unsigned long long *ctx)                  \
+	{                                                                      \
+		return ::cppbpf::detail::call_with_ctx<____##name>(ctx);       \
+	}                                                                      \
 	static CPPBPF_INLINE int ____##name(__VA_ARGS__)
 
 #endif /* CPPBPF_PROG_HPP */

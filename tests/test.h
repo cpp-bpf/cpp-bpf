@@ -5,24 +5,24 @@
 
 static int fails;
 
-#define CHECK(cond, ...)						\
-	do {								\
-		if (!(cond)) {						\
-			fails++;					\
-			std::printf("FAIL: " __VA_ARGS__);		\
-			std::printf("\n");				\
-		}							\
+#define CHECK(cond, ...)                                                       \
+	do {                                                                   \
+		if (!(cond)) {                                                 \
+			fails++;                                               \
+			std::printf("FAIL: " __VA_ARGS__);                     \
+			std::printf("\n");                                     \
+		}                                                              \
 	} while (0)
 
 /* Stop the test: later checks depend on this one. */
-#define REQUIRE(cond, ...)						\
-	do {								\
-		bool ok_ = (cond);					\
-		CHECK(ok_, __VA_ARGS__);				\
-		if (!ok_) {						\
-			std::printf("FAIL\n");				\
-			return 1;					\
-		}							\
+#define REQUIRE(cond, ...)                                                     \
+	do {                                                                   \
+		bool ok_ = static_cast<bool>(cond);                            \
+		CHECK(ok_, __VA_ARGS__);                                       \
+		if (!ok_) {                                                    \
+			std::printf("FAIL\n");                                 \
+			return 1;                                              \
+		}                                                              \
 	} while (0)
 
 static int test_result()

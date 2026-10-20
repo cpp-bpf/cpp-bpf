@@ -5,4 +5,10 @@ struct event {
 	__u32 tgid;
 	__u32 pid;
 };
+
+/* The userspace view of the per_pid values in basic.bpf.cpp. */
+struct stats_view {
+	__u64 switches;
+	__u32 lock;
+};
 #endif

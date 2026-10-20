@@ -21,8 +21,10 @@ namespace cppbpf {
  */
 class spin_guard {
 public:
-	[[nodiscard]] CPPBPF_INLINE explicit spin_guard(struct bpf_spin_lock &lock)
-		: lock_(lock), locked_(true)
+	[[nodiscard]] CPPBPF_INLINE explicit spin_guard(
+		struct bpf_spin_lock &lock) :
+		lock_(lock),
+		locked_(true)
 	{
 		bpf_spin_lock(&lock_);
 	}

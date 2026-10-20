@@ -4,6 +4,7 @@
 
 #include "common.hpp"
 #include "map.hpp"
+#include "maybe.hpp"
 #include "prog.hpp"
 #include "ringbuf.hpp"
 #include "sync.hpp"
