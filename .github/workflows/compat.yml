@@ -1,0 +1,62 @@
+name: C compatibility
+
+# The libbpf headers patched for C++ must not change C programs. Build the
+# programs of bcc's libbpf-tools with the original and the patched headers
+# and compare the objects. Weekly runs use libbpf master, to catch upstream
+# header changes that break the patch.
+
+on:
+  pull_request:
+    paths:
+      - include/**
+      - mk/**
+      - scripts/**
+      - compat/**
+      - .github/actions/**
+      - .github/workflows/compat.yml
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  LLVM_REPO: maxskokov/llvm-project
+  LLVM_SHA: 5b41c481dec56b73f856713824f0a2de6836e0ed
+  LIBBPF_SHA: 85c0d575a447651bbeb8e2376eacd64c30dce9a6 # v1.8.0
+  BPFTOOL_TAG: v7.7.0
+  BPFTOOL_SHA256: 09150596f09356b0ff632dd7f9856e0ea86bf96b269e9bc94278d9a9432a268c
+  BCC_SHA: c398a9a7a41cba623b520cda27457b92d7fcad2b
+
+jobs:
+  compat:
+    name: Compare C objects
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/toolchain
+        with:
+          libbpf-ref: ${{ github.event_name == 'schedule' && 'master' || env.LIBBPF_SHA }}
+
+      - name: Fetch libbpf-tools
+        run: |
+          git init -q ~/bcc
+          cd ~/bcc
+          git fetch -q --depth 1 --filter=blob:none https://github.com/iovisor/bcc "$BCC_SHA"
+          git sparse-checkout set --no-cone '/libbpf-tools/*.bpf.c' \
+            '/libbpf-tools/*.h' '/libbpf-tools/x86/'
+          git checkout -q FETCH_HEAD
+
+      - name: Compare
+        run: |
+          make -C compat CLANG="$CLANG" BPFTOOL="$BPFTOOL" \
+            LIBBPF_INC="$LIBBPF_INC" CORPUS="$HOME/bcc/libbpf-tools"
